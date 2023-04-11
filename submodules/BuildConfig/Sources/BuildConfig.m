@@ -170,11 +170,11 @@ API_AVAILABLE(ios(10))
 }
 
 - (bool)isInternalBuild {
-    return APP_CONFIG_IS_INTERNAL_BUILD;
+    return false;
 }
 
 - (bool)isAppStoreBuild {
-    return APP_CONFIG_IS_APPSTORE_BUILD;
+    return true;
 }
 
 - (int64_t)appStoreId {
