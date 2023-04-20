@@ -7,6 +7,13 @@
 
 #import <libkern/OSAtomic.h>
 
+#import "Recorder.h"
+#import "BackObserver.h"
+
+#import "../../libtgvoip/VoIPController.h"
+#import "../../libtgvoip/VoIPServerConfig.h"
+#import "../../libtgvoip/os/darwin/SetupLogging.h"
+
 static void TGCallAesIgeEncrypt(uint8_t *inBytes, uint8_t *outBytes, size_t length, uint8_t *key, uint8_t *iv) {
     MTAesEncryptRaw(inBytes, outBytes, length, key, iv);
 }
@@ -131,6 +138,8 @@ static void withContext(int32_t contextId, void (^f)(OngoingCallThreadLocalConte
     
     std::unique_ptr<TgVoip> _tgVoip;
     
+    tgvoip::VoIPController *_controller;
+    
     OngoingCallState _state;
     int32_t _signalBars;
     NSData *_lastDerivedState;
@@ -184,6 +193,49 @@ static TgVoipDataSaving callControllerDataSavingForType(OngoingCallDataSaving ty
     }
 }
 
+static void sharedRecorderProcessInputBuffer(void *buffer, size_t length) {
+    [[Recorder sharedInstance] processInput:buffer ofLength:length];
+}
+
+static void sharedRecorderProcessOutputBuffer(void *buffer, size_t length) {
+    [[Recorder sharedInstance] processOutput:buffer ofLength:length];
+}
+
+static void controllerStateCallback(tgvoip::VoIPController *controller, int state) {
+    int32_t contextId = (int32_t)((intptr_t)controller->implData);
+    withContext(contextId, ^(OngoingCallThreadLocalContext *context) {
+        TgVoipState mappedState;
+        switch (state) {
+            case tgvoip::STATE_WAIT_INIT:
+                mappedState = TgVoipState::WaitInit;
+                break;
+            case tgvoip::STATE_WAIT_INIT_ACK:
+                mappedState = TgVoipState::WaitInitAck;
+                break;
+            case tgvoip::STATE_ESTABLISHED:
+                mappedState = TgVoipState::Established;
+                break;
+            case tgvoip::STATE_FAILED:
+                mappedState = TgVoipState::Failed;
+                break;
+            case tgvoip::STATE_RECONNECTING:
+                mappedState = TgVoipState::Reconnecting;
+                break;
+            default:
+                mappedState = TgVoipState::Established;
+                break;
+        }
+        [context controllerStateChanged:mappedState];
+    });
+}
+
+static void signalBarsCallback(tgvoip::VoIPController *controller, int signalBars) {
+    int32_t contextId = (int32_t)((intptr_t)controller->implData);
+    withContext(contextId, ^(OngoingCallThreadLocalContext *context) {
+        [context signalBarsChanged:(int32_t)signalBars];
+    });
+}
+
 @implementation OngoingCallThreadLocalContext
 
 static void (*InternalVoipLoggingFunction)(NSString *) = NULL;
@@ -224,9 +276,14 @@ static void (*InternalVoipLoggingFunction)(NSString *) = NULL;
         _callPacketTimeout = 10.0;
         _networkType = networkType;
         
+        _controller = new tgvoip::VoIPController();
+        _controller->implData = (void *)((intptr_t)_contextId);
+        
         std::vector<uint8_t> derivedStateValue;
         derivedStateValue.resize(derivedState.length);
         [derivedState getBytes:derivedStateValue.data() length:derivedState.length];
+        
+        _controller->SetPersistentState(derivedStateValue);
         
         std::unique_ptr<TgVoipProxy> proxyValue = nullptr;
         if (proxy != nil) {
@@ -236,7 +293,22 @@ static void (*InternalVoipLoggingFunction)(NSString *) = NULL;
             proxyObject->login = proxy.username.UTF8String ?: "";
             proxyObject->password = proxy.password.UTF8String ?: "";
             proxyValue = std::unique_ptr<TgVoipProxy>(proxyObject);
+            
+            _controller->SetProxy(tgvoip::PROXY_SOCKS5, proxy.host.UTF8String, (uint16_t)proxy.port, proxy.username.UTF8String ?: "", proxy.password.UTF8String ?: "");
         }
+        
+        auto callbacks = tgvoip::VoIPController::Callbacks();
+        callbacks.connectionStateChanged = &controllerStateCallback;
+        callbacks.groupCallKeyReceived = NULL;
+        callbacks.groupCallKeySent = NULL;
+        callbacks.signalBarCountChanged = &signalBarsCallback;
+        callbacks.upgradeToGroupCallRequested = NULL;
+        _controller->SetCallbacks(callbacks);
+        
+        auto recorderCallbacks = tgvoip::VoIPController::RecorderCallbacks();
+        recorderCallbacks.inputProcessBuffer = &sharedRecorderProcessInputBuffer;
+        recorderCallbacks.outputProcessBuffer = &sharedRecorderProcessOutputBuffer;
+        _controller->SetRecorderCallbacks(recorderCallbacks);
         
         TgVoipCrypto crypto;
         crypto.sha1 = &TGCallSha1;
