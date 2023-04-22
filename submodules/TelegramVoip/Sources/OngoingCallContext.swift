@@ -926,6 +926,7 @@ public final class OngoingCallContext {
                                     }
                                     strongSelf.withContext { context in
                                         if let context = context as? OngoingCallThreadLocalContextWebrtc {
+                                            print("111111111 OngoingCallThreadLocalContextWebrtc 929")
                                             context.addSignaling(data)
                                         }
                                     }
@@ -942,11 +943,13 @@ public final class OngoingCallContext {
                             if let signalingConnectionManager = strongSelf.signalingConnectionManager {
                                 signalingConnectionManager.with { impl in
                                     impl.send(payloadData: data)
+                                    print("111111111 impl.send(payloadData: data) 946")
                                 }
                             }
                             
                             if let callSessionManager = callSessionManager {
                                 callSessionManager.sendSignalingData(internalId: internalId, data: data)
+                                print("111111111 callSessionManager.sendSignalingData(internalId: internalId, data: data) 952")
                             }
                         }
                     }, videoCapturer: video?.impl, preferredVideoCodec: preferredVideoCodec, audioInputDeviceId: "", audioDevice: audioDevice?.impl)
@@ -1040,6 +1043,7 @@ public final class OngoingCallContext {
                         }
                     }
                     let context = OngoingCallThreadLocalContext(queue: OngoingCallThreadLocalContextQueueImpl(queue: queue), proxy: voipProxyServer, networkType: ongoingNetworkTypeForType(initialNetworkType), dataSaving: ongoingDataSavingForType(dataSaving), derivedState: Data(), key: key, isOutgoing: isOutgoing, primaryConnection: callConnectionDescription(connections.primary)!, alternativeConnections: connections.alternatives.compactMap(callConnectionDescription), maxLayer: maxLayer, allowP2P: allowP2P, logPath: logPath)
+                    print("111111111 OngoingCallThreadLocalContext 1046")
                     
                     strongSelf.contextRef = Unmanaged.passRetained(OngoingCallThreadLocalContextHolder(context))
                     context.stateChanged = { state in
@@ -1058,6 +1062,7 @@ public final class OngoingCallContext {
                 }
 
                 strongSelf.signalingDataDisposable = callSessionManager.beginReceivingCallSignalingData(internalId: internalId, { [weak self] dataList in
+                    print("111111111 signalingDataDisposable 1065")
                     queue.async {
                         self?.withContext { context in
                             if let context = context as? OngoingCallThreadLocalContextWebrtc {
@@ -1070,6 +1075,7 @@ public final class OngoingCallContext {
                 })
                 
                 strongSelf.signalingConnectionManager?.with { impl in
+                    print("111111111 start 1078")
                     impl.start()
                 }
             }
