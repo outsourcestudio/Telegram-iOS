@@ -193,13 +193,13 @@ static TgVoipDataSaving callControllerDataSavingForType(OngoingCallDataSaving ty
     }
 }
 
-static void sharedRecorderProcessInputBuffer(void *buffer, size_t length) {
-    [[Recorder sharedInstance] processInput:buffer ofLength:length];
-}
-
-static void sharedRecorderProcessOutputBuffer(void *buffer, size_t length) {
-    [[Recorder sharedInstance] processOutput:buffer ofLength:length];
-}
+//static void sharedRecorderProcessInputBuffer(void *buffer, size_t length) {
+//    [[Recorder sharedInstance] processInput:buffer ofLength:length];
+//}
+//
+//static void sharedRecorderProcessOutputBuffer(void *buffer, size_t length) {
+//    [[Recorder sharedInstance] processOutput:buffer ofLength:length];
+//}
 
 static void controllerStateCallback(tgvoip::VoIPController *controller, int state) {
     int32_t contextId = (int32_t)((intptr_t)controller->implData);
@@ -305,10 +305,10 @@ static void (*InternalVoipLoggingFunction)(NSString *) = NULL;
         callbacks.upgradeToGroupCallRequested = NULL;
         _controller->SetCallbacks(callbacks);
         
-        auto recorderCallbacks = tgvoip::VoIPController::RecorderCallbacks();
-        recorderCallbacks.inputProcessBuffer = &sharedRecorderProcessInputBuffer;
-        recorderCallbacks.outputProcessBuffer = &sharedRecorderProcessOutputBuffer;
-        _controller->SetRecorderCallbacks(recorderCallbacks);
+//        auto recorderCallbacks = tgvoip::VoIPController::RecorderCallbacks();
+//        recorderCallbacks.inputProcessBuffer = &sharedRecorderProcessInputBuffer;
+//        recorderCallbacks.outputProcessBuffer = &sharedRecorderProcessOutputBuffer;
+//        _controller->SetRecorderCallbacks(recorderCallbacks);
         
         TgVoipCrypto crypto;
         crypto.sha1 = &TGCallSha1;
